@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
+use aes::Aes128;
 
 pub const AES_128_KEY_SIZE: usize = 16;
 pub struct KeySource([u8; AES_128_KEY_SIZE]);
@@ -28,6 +29,9 @@ impl Keys {
         let mut lines = reader.lines();
         while let Some(Ok(line)) = lines.next() {
             let split: Vec<&str> = line.splitn(2, "=").collect();
+            if split.len() != 2 {
+                continue
+            }
             let key = decode_hex_key(split[1]);
             match split[0].trim() {
                 "aes_kek_generation_source" => self.aes_kek_generation_source = key,
@@ -37,7 +41,7 @@ impl Keys {
         }
         Ok(())
     }
-    pub fn generate_aes_kek(&self, wrapped_kek: &KeySource, master_key_rev: u32, packed_options: u32) {
+    pub fn generate_aes_kek(&self, wrapped_kek: &KeySource) {
         
     }
 }
