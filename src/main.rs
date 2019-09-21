@@ -2,18 +2,21 @@ extern crate clap;
 extern crate hex;
 extern crate byteorder;
 extern crate aes;
+extern crate aes_ctr;
 extern crate sha2;
 
 mod keys;
 mod header;
 
 use clap::{Arg, App, ArgMatches};
-use keys::Keys;
+use keys::{Keys, aes_128_ctr_dec};
 use header::transform_header;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use sha2::{Sha256, Digest};
+
+const HARDCODED_SOURCE: [u8; 16] =  [0x19, 0x18, 0x84, 0x74, 0x3e, 0x24, 0xc7, 0x7d, 0x87, 0xc6, 0x9e, 0x42, 0x7, 0xd0, 0xc4, 0x38];
 
 fn main() -> std::io::Result<()> {
     let matches = get_matches();
@@ -29,6 +32,7 @@ fn main() -> std::io::Result<()> {
     }
 
     let input = matches.value_of("INPUT").expect("failed to get filename");
+    let output = matches.value_of("OUTPUT").expect("failed to get filename");
     let offset_str = matches.value_of("offset").unwrap_or_default();
     let offset = offset_str.parse::<u64>().expect("offset must be a number");
 
@@ -38,8 +42,21 @@ fn main() -> std::io::Result<()> {
     }
     file.seek(SeekFrom::Start(offset))?;
 
-    let mut header_bytes = [0; 32];
+    let mut header_bytes = [0u8; 32];
+    let mut header2_bytes = [0u8; 4];
+    let mut nonce_bytes = [0u8; 4];
+    let mut nonce = [0u8; 16];
+    let mut data = [0u8; 1312];
     file.read(&mut header_bytes)?;
+    file.read(&mut header2_bytes)?;
+    file.read(&mut nonce_bytes)?;
+    file.read(&mut data)?;
+
+    nonce[0..4].copy_from_slice(&nonce_bytes);
+    if verbose {
+        println!("nonce: {:x?}", &nonce);
+    }
+
     let transformed_header = transform_header(&header_bytes);
     if verbose {
         println!("header: {:x?}", &header_bytes);
@@ -50,7 +67,26 @@ fn main() -> std::io::Result<()> {
         println!("hash: {:x?}", &hash);
     }
 
+    let kek = keys.generate_aes_kek(&HARDCODED_SOURCE);
+
+    let key = keys.generate_aes_key(&kek, &s32_16(&hash));
+
+    if verbose {
+        println!("kek: {:x?}", &kek);
+        println!("key: {:x?}", &key);
+    }
+
+    aes_128_ctr_dec(&mut data, &key, &nonce);
+    let mut output_file = File::create(output)?;
+    output_file.write(&data)?;
+
     Ok(())
+}
+
+fn s32_16(s32: &[u8; 32]) -> [u8; 16] {
+    let mut out = [0u8; 16];
+    out.copy_from_slice(&s32[0..16]);
+    out
 }
 
 fn sha256(data: &[u8]) -> [u8; 32] {
@@ -75,6 +111,9 @@ fn get_matches<'a>() -> ArgMatches<'a> {
             .help("Load keys from an external file"))
         .arg(Arg::with_name("INPUT")
             .help("Beacon Action frame")
+            .required(true))
+        .arg(Arg::with_name("OUTPUT")
+            .help("Decrypted file")
             .required(true))
         .arg(Arg::with_name("offset")
             .short("o")
