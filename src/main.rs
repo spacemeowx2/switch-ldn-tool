@@ -9,14 +9,15 @@ mod keys;
 mod header;
 
 use clap::{Arg, App, ArgMatches};
-use keys::{Keys, aes_128_ctr_dec};
+use keys::{Keys, aes_128_ctr_dec, decode_hex_aeskey};
 use header::transform_header;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use sha2::{Sha256, Digest};
 
-const HARDCODED_SOURCE: [u8; 16] =  [0x19, 0x18, 0x84, 0x74, 0x3e, 0x24, 0xc7, 0x7d, 0x87, 0xc6, 0x9e, 0x42, 0x7, 0xd0, 0xc4, 0x38];
+// const HARDCODED_SOURCE: [u8; 16] =  [0x19, 0x18, 0x84, 0x74, 0x3e, 0x24, 0xc7, 0x7d, 0x87, 0xc6, 0x9e, 0x42, 0x7, 0xd0, 0xc4, 0x38];
+const HARDCODED_SOURCE: [u8; 16] = [0xf1, 0xe7, 0x1, 0x84, 0x19, 0xa8, 0x4f, 0x71, 0x1d, 0xa7, 0x14, 0xc2, 0xcf, 0x91, 0x9c, 0x9c];
 
 fn main() -> std::io::Result<()> {
     let matches = get_matches();
@@ -62,14 +63,13 @@ fn main() -> std::io::Result<()> {
         println!("header: {:x?}", &header_bytes);
         println!("transformed_header: {:x?}", &transformed_header);
     }
-    let hash = sha256(&transformed_header);
+    let hash = s32_16(&sha256(&transformed_header));
     if verbose {
         println!("hash: {:x?}", &hash);
     }
 
     let kek = keys.generate_aes_kek(&HARDCODED_SOURCE);
-
-    let key = keys.generate_aes_key(&kek, &s32_16(&hash));
+    let key = keys.generate_aes_key(&kek, &hash);
 
     if verbose {
         println!("kek: {:x?}", &kek);
