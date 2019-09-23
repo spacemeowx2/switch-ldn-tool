@@ -82,6 +82,13 @@ impl Keys {
         }
     }
     pub fn read_from_file(&mut self, filename: &str) -> std::io::Result<()> {
+        macro_rules! check_len {
+            ( $field:ident ) => {
+                if self.$field.len() != 16 {
+                    return Err(std::io::Error::new(std::io::ErrorKind::Other, format!("{} length is not 16", stringify!($field))));
+                }
+            };
+        }
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
@@ -98,6 +105,9 @@ impl Keys {
                 &_ => ()
             }
         }
+        check_len!(aes_kek_generation_source);
+        check_len!(aes_key_generation_source);
+        check_len!(master_key);
         Ok(())
     }
     pub fn generate_aes_kek(&self, wrapped_kek: &KeySource) -> AesKey {
