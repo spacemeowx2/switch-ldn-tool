@@ -8,11 +8,11 @@ extern crate sha2;
 mod keys;
 mod ldn_frame;
 
-use clap::{Arg, App as ClapApp, ArgMatches};
-use keys::{Keys, aes_128_ctr_dec, decode_hex_aeskey};
+use clap::{Arg, App, ArgMatches};
+use keys::Keys;
 use std::fs::File;
-use std::io::prelude::*;
-use std::io::SeekFrom;
+
+
 use ldn_frame::LdnFrame;
 
 fn main() -> std::io::Result<()> {
@@ -51,7 +51,7 @@ fn main() -> std::io::Result<()> {
 }
 
 fn get_matches<'a>() -> ArgMatches<'a> {
-    ClapApp::new("switch-ldn-tool")
+    App::new("switch-ldn-tool")
         .version("0.1.0")
         .author("spacemeowx2")
         .help("Decrypt ldn beacon action frame")

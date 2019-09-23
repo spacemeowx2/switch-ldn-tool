@@ -1,4 +1,4 @@
-use crate::keys::{Keys, aes_128_ctr_dec, decode_hex_aeskey};
+use crate::keys::{Keys, aes_128_ctr_dec};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;

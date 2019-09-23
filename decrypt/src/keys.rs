@@ -3,7 +3,7 @@ use std::io::BufReader;
 use std::io::prelude::*;
 use aes_ctr::Aes128Ctr;
 use aes_ctr::stream_cipher::{
-    NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek
+    NewStreamCipher, SyncStreamCipher
 };
 use aes::Aes128;
 use aes::block_cipher_trait::generic_array::GenericArray;
