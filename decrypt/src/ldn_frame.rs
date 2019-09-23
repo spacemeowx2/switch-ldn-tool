@@ -26,11 +26,11 @@ impl LdnFrame {
         let mut nonce = [0u8; 16];
         let mut data = [0u8; 1312];
 
-        self.go_offset(file)?;
-        file.read(&mut header_bytes)?;
-        file.read(&mut header2_bytes)?;
-        file.read(&mut nonce_bytes)?;
-        file.read(&mut data)?;
+        let skipped_buf = self.read_offset(file)?;
+        file.read_exact(&mut header_bytes)?;
+        file.read_exact(&mut header2_bytes)?;
+        file.read_exact(&mut nonce_bytes)?;
+        file.read_exact(&mut data)?;
 
         nonce[0..4].copy_from_slice(&nonce_bytes);
         if self.verbose {
@@ -57,15 +57,23 @@ impl LdnFrame {
         }
 
         aes_128_ctr_dec(&mut data, &key, &nonce);
+
+        output_file.write(&skipped_buf)?;
+        output_file.write(&header_bytes)?;
+        output_file.write(&header2_bytes)?;
+        output_file.write(&nonce_bytes)?;
         output_file.write(&data)?;
         Ok(())
     }
-    fn go_offset(&self, file: &mut File) -> std::io::Result<()> {
+    fn read_offset(&self, file: &mut File) -> std::io::Result<Vec<u8>> {
         if self.verbose {
             println!("seeking to offset: {:?}", self.offset);
         }
-        file.seek(SeekFrom::Start(self.offset))?;
-        Ok(())
+        let offset = self.offset as usize;
+        let mut out: Vec<u8> = vec![0; offset];
+        file.read_exact(&mut out)?;
+        println!("fuck {:x?} {}", out, self.offset);
+        Ok(out)
     }
 }
 

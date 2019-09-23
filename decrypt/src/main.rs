@@ -43,11 +43,7 @@ fn main() -> std::io::Result<()> {
     frame.verbose = verbose;
     frame.offset = offset;
 
-    if encrypt_mode {
-        Ok(())
-    } else {
-        frame.decrypt(&mut input_file, &mut output_file)
-    }
+    frame.decrypt(&mut input_file, &mut output_file)
 }
 
 fn get_matches<'a>() -> ArgMatches<'a> {
@@ -73,10 +69,6 @@ fn get_matches<'a>() -> ArgMatches<'a> {
             .value_name("OFFSET")
             .default_value("0")
             .help("Bytes to skip in INPUT file"))
-        .arg(Arg::with_name("encrypt")
-            .short("e")
-            .long("encrypt")
-            .help("Encrypt from input to output"))
         .arg(Arg::with_name("verbose")
             .short("v")
             .help("Show verbose"))
