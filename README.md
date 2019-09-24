@@ -25,5 +25,5 @@ kek = GenerateAesKek(<hardcoded keydata>, 0, 0)
 hash = sha256(Header[0..32])
 key = GenerateAesKey(kek, hash)
 
-frame[10..] = aes_128_ctr(key, nonce, frame[10..])
+frame[40..] = aes_128_ctr(key, nonce, frame[10..])
 ```
