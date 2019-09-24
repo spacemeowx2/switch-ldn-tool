@@ -16,6 +16,7 @@ pub struct LdnFrameBuilder {
     keys: Keys,
     pub verbose: bool,
     pub offset: u64,
+    pub padding: usize,
 }
 
 impl LdnFrameBuilder {
@@ -25,30 +26,55 @@ impl LdnFrameBuilder {
             keys,
             verbose: false,
             offset: 0,
+            padding: 0,
         }
     }
     pub fn encrypt(&self, file: &mut File, output_file: &mut File) -> std::io::Result<()> {
-        self.decrypt(file, output_file)
-    }
-    pub fn decrypt(&self, file: &mut File, output_file: &mut File) -> std::io::Result<()> {
+        println!("Building mode");
         let skipped_buf = self.read_offset(file)?;
         let mut frame = LdnFrame::new();
         frame.read_from_file(file)?;
 
-        let LdnFrame { header, mut content } = frame;
+        let header = &frame.header;
 
         if self.verbose {
             println!("header: {:x?}", &header);
         }
 
         let key = self.get_key(&header);
-        let mut nonce = [0u8; 16];
-        nonce[0..4].copy_from_slice(header.nonce());
-        aes_128_ctr_dec(&mut content, &key, &nonce);
+
+        let hash = frame.calculate_sha256();
+        if hash == frame.sha256() {
+            println!("checksum is not changed");
+        } else {
+            println!("checksum mismatch, using new checksum: {:x?}", hash);
+            frame.set_sha256(&hash);
+        }
+
+        frame.encrypt(&key);
 
         output_file.write(&skipped_buf)?;
-        output_file.write(header.bytes())?;
-        output_file.write(&content)?;
+        frame.write_to_file(output_file)?;
+        output_file.write(&vec![0u8; self.padding][..])?;
+        Ok(())
+    }
+    pub fn decrypt(&self, file: &mut File, output_file: &mut File) -> std::io::Result<()> {
+        let skipped_buf = self.read_offset(file)?;
+        let mut frame = LdnFrame::new();
+        frame.read_from_file(file)?;
+
+        let header = &frame.header;
+
+        if self.verbose {
+            println!("header: {:x?}", &header);
+        }
+
+        let key = self.get_key(&header);
+        frame.decrypt(&key);
+
+        output_file.write(&skipped_buf)?;
+        frame.write_to_file(output_file)?;
+        output_file.write(&vec![0u8; self.padding][..])?;
         Ok(())
     }
     fn get_key(&self, header: &LdnFrameHeader) -> AesKey {
@@ -158,8 +184,13 @@ impl LdnFrame {
     }
     fn read_from_file(&mut self, file: &mut File) -> std::io::Result<()> {
         self.header.read_from_file(file)?;
-        self.content = vec![0; self.header.content_length()];
+        self.content = vec![0; self.header.content_length() + 32];
         file.read_exact(&mut self.content)?;
+        Ok(())
+    }
+    fn write_to_file(&self, file: &mut File) -> std::io::Result<()> {
+        file.write(self.header.bytes())?;
+        file.write(&self.content)?;
         Ok(())
     }
     fn sha256(&self) -> &[u8] {
@@ -167,5 +198,23 @@ impl LdnFrame {
     }
     fn set_sha256(&mut self, hash: &[u8; 32]) {
         &mut self.content[frame_field::SHA256].copy_from_slice(hash);
+    }
+    fn calculate_sha256(&self) -> [u8; 32] {
+        let mut output = [0u8; 32];
+        let mut hasher = Sha256::new();
+        hasher.input(&self.header.bytes()[..]);
+        hasher.input(&[0; 32]);
+        hasher.input(&self.content[32..]);
+        let result = hasher.result();
+        output.copy_from_slice(result.as_slice());
+        output
+    }
+    fn decrypt(&mut self, key: &AesKey) {
+        let mut nonce = [0u8; 16];
+        nonce[0..4].copy_from_slice(self.header.nonce());
+        aes_128_ctr_dec(&mut self.content, key, &nonce);
+    }
+    fn encrypt(&mut self, key: &AesKey) {
+        self.decrypt(key)
     }
 }

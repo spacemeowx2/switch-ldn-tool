@@ -36,12 +36,15 @@ fn main() -> std::io::Result<()> {
 
     let offset_str = matches.value_of("offset").unwrap_or_default();
     let offset = offset_str.parse::<u64>().expect("offset must be a number");
+    let padding_str = matches.value_of("padding").unwrap_or_default();
+    let padding = padding_str.parse::<usize>().expect("padding must be a number");
 
     let mut input_file = File::open(input)?;
     let mut output_file = File::create(output)?;
 
     frame.verbose = verbose;
     frame.offset = offset;
+    frame.padding = padding;
 
     if build_mode {
         frame.encrypt(&mut input_file, &mut output_file)
@@ -77,6 +80,11 @@ fn get_matches<'a>() -> ArgMatches<'a> {
             .short("b")
             .long("build")
             .help("Override SHA256"))
+        .arg(Arg::with_name("padding")
+            .short("p")
+            .long("padding")
+            .default_value("0")
+            .help("Add length of 0x00 to the end of file"))
         .arg(Arg::with_name("verbose")
             .short("v")
             .help("Show verbose"))
