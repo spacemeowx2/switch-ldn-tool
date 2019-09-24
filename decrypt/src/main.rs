@@ -13,12 +13,12 @@ use keys::Keys;
 use std::fs::File;
 
 
-use ldn_frame::LdnFrame;
+use ldn_frame::LdnFrameBuilder;
 
 fn main() -> std::io::Result<()> {
     let matches = get_matches();
     let verbose = matches.is_present("verbose");
-    let encrypt_mode = matches.is_present("encrypt");
+    let build_mode = matches.is_present("build");
     let keyset = matches.value_of("keyset").unwrap_or_default();
     let mut keys = Keys::new();
     
@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
         println!("{:x?}", &keys);
     }
 
-    let mut frame = LdnFrame::new(keys);
+    let mut frame = LdnFrameBuilder::new(keys);
 
     let input = matches.value_of("INPUT").expect("failed to get filename");
     let output = matches.value_of("OUTPUT").expect("failed to get filename");
@@ -43,7 +43,11 @@ fn main() -> std::io::Result<()> {
     frame.verbose = verbose;
     frame.offset = offset;
 
-    frame.decrypt(&mut input_file, &mut output_file)
+    if build_mode {
+        frame.encrypt(&mut input_file, &mut output_file)
+    } else {
+        frame.decrypt(&mut input_file, &mut output_file)
+    }
 }
 
 fn get_matches<'a>() -> ArgMatches<'a> {
@@ -69,6 +73,10 @@ fn get_matches<'a>() -> ArgMatches<'a> {
             .value_name("OFFSET")
             .default_value("0")
             .help("Bytes to skip in INPUT file"))
+        .arg(Arg::with_name("build")
+            .short("b")
+            .long("build")
+            .help("Override SHA256"))
         .arg(Arg::with_name("verbose")
             .short("v")
             .help("Show verbose"))
