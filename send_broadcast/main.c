@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-
 int main(int arg, const char** argv) {
     if (arg != 3) {
         printf("usage:\n  %s interface filename\n", argv[0]);
@@ -29,12 +28,31 @@ int main(int arg, const char** argv) {
 
     buf = malloc(file_size);
     fread(buf, file_size, 1, file);
-
-    dev = pcap_open_live(argv[1], 65535, 1, 500, err_buf);
+    dev = pcap_create(argv[1], err_buf);
     if (!dev) {
-        printf("Error: %s\n", err_buf);
+        printf("Error pcap_create: %s\n", err_buf);
         return 1;
     }
+
+    pcap_set_snaplen(dev, 65535);
+    pcap_set_promisc(dev, 1);
+    pcap_set_timeout(dev, 500);
+    pcap_set_buffer_size(dev, 1024 * 1024);
+    rc = pcap_set_rfmon(dev, 1);
+    if (rc != 0) {
+        printf("Error pcap_set_rfmon: %d\n", rc);
+        return 1;
+    }
+    rc = pcap_activate(dev);
+    if (rc != 0) {
+        printf("Error pcap_activate: %d\n", rc);
+        if (rc == -1) {
+            printf("  %s\n", pcap_geterr(dev));
+        }
+    }
+
+    unsigned char datalink = pcap_datalink(dev);
+    printf("datalink: %u\n", datalink);
 
     puts("Begin sending");
     while (1) {
