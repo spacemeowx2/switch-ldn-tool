@@ -1,92 +1,65 @@
-extern crate clap;
-extern crate hex;
-extern crate byteorder;
-extern crate aes;
-extern crate aes_ctr;
-extern crate sha2;
-
 mod keys;
 mod ldn_frame;
 
-use clap::{Arg, App, ArgMatches};
-use keys::Keys;
 use std::fs::File;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
-
+use keys::Keys;
 use ldn_frame::LdnFrameBuilder;
 
-fn main() -> std::io::Result<()> {
-    let matches = get_matches();
-    let verbose = matches.is_present("verbose");
-    let build_mode = matches.is_present("build");
-    let keyset = matches.value_of("keyset").unwrap_or_default();
+#[derive(Debug, StructOpt)]
+#[structopt(name = "switch-ldn-tool", about = "Decrypt ldn beacon action frame.")]
+struct Opt {
+    /// Load keys from an external file
+    #[structopt(short, long, parse(from_os_str), default_value = "prod.keys")]
+    keyset: PathBuf,
+
+    /// Beacon Action frame
+    #[structopt(parse(from_os_str))]
+    input: PathBuf,
+
+    /// Decrypted file
+    #[structopt(parse(from_os_str))]
+    output: PathBuf,
+
+    /// Bytes to skip in INPUT file
+    #[structopt(short, long, default_value = "0")]
+    offset: u64,
+
+    /// Add length of 0x00 to the end of file
+    #[structopt(short, long, default_value = "0")]
+    padding: usize,
+
+    /// Override SHA256
+    #[structopt(short, long)]
+    build: bool,
+}
+
+fn main() -> anyhow::Result<()> {
+    env_logger::init();
+    let opt = Opt::from_args();
+    // let build_mode = matches.is_present("build");
+    // let keyset = matches.value_of("keyset").unwrap_or_default();
     let mut keys = Keys::new();
     
-    println!("Loading keyset from {}...", keyset);
-    keys.read_from_file(keyset)?;
+    log::info!("Loading keyset from {:?}...", opt.keyset);
+    keys.read_from_file(&opt.keyset)?;
 
-    if verbose {
-        println!("{:x?}", &keys);
-    }
+    log::debug!("{:x?}", &keys);
 
     let mut frame = LdnFrameBuilder::new(keys);
 
-    let input = matches.value_of("INPUT").expect("failed to get filename");
-    let output = matches.value_of("OUTPUT").expect("failed to get filename");
+    let mut input_file = File::open(opt.input)?;
+    let mut output_file = File::create(opt.output)?;
 
-    let offset_str = matches.value_of("offset").unwrap_or_default();
-    let offset = offset_str.parse::<u64>().expect("offset must be a number");
-    let padding_str = matches.value_of("padding").unwrap_or_default();
-    let padding = padding_str.parse::<usize>().expect("padding must be a number");
+    frame.offset = opt.offset;
+    frame.padding = opt.padding;
 
-    let mut input_file = File::open(input)?;
-    let mut output_file = File::create(output)?;
-
-    frame.verbose = verbose;
-    frame.offset = offset;
-    frame.padding = padding;
-
-    if build_mode {
-        frame.encrypt(&mut input_file, &mut output_file)
+    if opt.build {
+        frame.encrypt(&mut input_file, &mut output_file)?;
     } else {
-        frame.decrypt(&mut input_file, &mut output_file)
+        frame.decrypt(&mut input_file, &mut output_file)?;
     }
-}
-
-fn get_matches<'a>() -> ArgMatches<'a> {
-    App::new("switch-ldn-tool")
-        .version("0.1.0")
-        .author("spacemeowx2")
-        .help("Decrypt ldn beacon action frame")
-        .arg(Arg::with_name("keyset")
-            .short("k")
-            .long("keyset")
-            .value_name("KEY")
-            .default_value("prod.keys")
-            .help("Load keys from an external file"))
-        .arg(Arg::with_name("INPUT")
-            .help("Beacon Action frame")
-            .required(true))
-        .arg(Arg::with_name("OUTPUT")
-            .help("Decrypted file")
-            .required(true))
-        .arg(Arg::with_name("offset")
-            .short("o")
-            .long("offset")
-            .value_name("OFFSET")
-            .default_value("0")
-            .help("Bytes to skip in INPUT file"))
-        .arg(Arg::with_name("build")
-            .short("b")
-            .long("build")
-            .help("Override SHA256"))
-        .arg(Arg::with_name("padding")
-            .short("p")
-            .long("padding")
-            .default_value("0")
-            .help("Add length of 0x00 to the end of file"))
-        .arg(Arg::with_name("verbose")
-            .short("v")
-            .help("Show verbose"))
-        .get_matches()
+    Ok(())
 }

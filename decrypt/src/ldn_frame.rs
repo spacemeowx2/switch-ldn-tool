@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use sha2::{Sha256, Digest};
 use byteorder::{ByteOrder, BigEndian};
+use anyhow::{Context, Result};
 
 #[repr(C, packed)]
 pub struct LdnFrameHeader([u8; 40]);
@@ -29,7 +30,7 @@ impl LdnFrameBuilder {
             padding: 0,
         }
     }
-    pub fn encrypt(&self, file: &mut File, output_file: &mut File) -> std::io::Result<()> {
+    pub fn encrypt(&self, file: &mut File, output_file: &mut File) -> Result<()> {
         println!("Building mode");
         let skipped_buf = self.read_offset(file)?;
         let mut frame = LdnFrame::new();
@@ -58,10 +59,10 @@ impl LdnFrameBuilder {
         output_file.write(&vec![0u8; self.padding][..])?;
         Ok(())
     }
-    pub fn decrypt(&self, file: &mut File, output_file: &mut File) -> std::io::Result<()> {
+    pub fn decrypt(&self, file: &mut File, output_file: &mut File) -> Result<()> {
         let skipped_buf = self.read_offset(file)?;
         let mut frame = LdnFrame::new();
-        frame.read_from_file(file)?;
+        frame.read_from_file(file).context("frame.read_from_file")?;
 
         let header = &frame.header;
 
@@ -182,10 +183,11 @@ impl LdnFrame {
             content: Vec::new(),
         }
     }
-    fn read_from_file(&mut self, file: &mut File) -> std::io::Result<()> {
-        self.header.read_from_file(file)?;
+    fn read_from_file(&mut self, file: &mut File) -> Result<()> {
+        self.header.read_from_file(file).context("header.read_from_file")?;
+        log::debug!("Content length: {:?}", self.header.content_length());
         self.content = vec![0; self.header.content_length() + 32];
-        file.read_exact(&mut self.content)?;
+        file.read_exact(&mut self.content).context("file.read_exact")?;
         Ok(())
     }
     fn write_to_file(&self, file: &mut File) -> std::io::Result<()> {
