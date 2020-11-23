@@ -15,17 +15,16 @@ pub struct LdnFrame {
 
 pub struct LdnFrameBuilder {
     keys: Keys,
-    pub verbose: bool,
     pub offset: u64,
     pub padding: usize,
 }
 
 impl LdnFrameBuilder {
-    const HARDCODED_SOURCE: [u8; 16] =  [0x19, 0x18, 0x84, 0x74, 0x3e, 0x24, 0xc7, 0x7d, 0x87, 0xc6, 0x9e, 0x42, 0x7, 0xd0, 0xc4, 0x38];
+    // const DATA_KEY: [u8; 16] = [0x2B, 0x3F, 0xFD, 0x0A, 0x34, 0xAC, 0xE2, 0x77, 0x6F, 0x08, 0x5F, 0x99, 0x87, 0xC2, 0xB9, 0x3D];
+    const ACTION_KEY: [u8; 16] = [0xC3, 0xC0, 0x78, 0xFA, 0x13, 0x20, 0x6A, 0x7B, 0xF5, 0x69, 0xD5, 0x19, 0x4F, 0x83, 0xE1, 0x99];
     pub fn new(keys: Keys) -> LdnFrameBuilder {
         LdnFrameBuilder {
             keys,
-            verbose: false,
             offset: 0,
             padding: 0,
         }
@@ -38,9 +37,7 @@ impl LdnFrameBuilder {
 
         let header = &frame.header;
 
-        if self.verbose {
-            println!("header: {:x?}", &header);
-        }
+        log::debug!("header: {:x?}", &header);
 
         let key = self.get_key(&header);
 
@@ -66,9 +63,7 @@ impl LdnFrameBuilder {
 
         let header = &frame.header;
 
-        if self.verbose {
-            println!("header: {:x?}", &header);
-        }
+        log::debug!("header: {:x?}", &header);
 
         let key = self.get_key(&header);
         frame.decrypt(&key);
@@ -81,21 +76,15 @@ impl LdnFrameBuilder {
     fn get_key(&self, header: &LdnFrameHeader) -> AesKey {
         let keys = &self.keys;
         let hash = sha256_16(&header.bytes()[0..32]);
-        let kek = keys.generate_aes_kek(&LdnFrameBuilder::HARDCODED_SOURCE);
-        let key = keys.generate_aes_key(&kek, &hash);
+        let key = keys.derive_key(&LdnFrameBuilder::ACTION_KEY, &hash);
 
-        if self.verbose {
-            println!("hash: {:x?}", &hash);
-            println!("kek: {:x?}", &kek);
-            println!("key: {:x?}", &key);
-        }
+        log::debug!("hash: {:x?}", &hash);
+        log::debug!("key: {:x?}", &key);
 
         key
     }
     fn read_offset(&self, file: &mut File) -> std::io::Result<Vec<u8>> {
-        if self.verbose {
-            println!("seeking to offset: {:?}", self.offset);
-        }
+        log::debug!("seeking to offset: {:?}", self.offset);
         let offset = self.offset as usize;
         let mut out: Vec<u8> = vec![0; offset];
         file.read_exact(&mut out)?;

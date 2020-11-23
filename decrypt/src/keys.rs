@@ -75,6 +75,7 @@ fn unseal_key(key: &AesKey) -> AesKey {
 }
 
 impl Keys {
+    const DERIVE_WITH: [u8; 16] = [0xDA, 0xD8, 0xFC, 0x8E, 0x2D, 0x04, 0xAD, 0x06, 0x72, 0xAF, 0x4B, 0x5B, 0x48, 0x53, 0x25, 0xA1];
     pub fn new() -> Keys {
         Keys {
             aes_kek_generation_source: vec![],
@@ -122,6 +123,15 @@ impl Keys {
         let kek = unseal_key(&access_key);
         let src_kek = decrypt_key(&kek, &vec2key(&self.aes_key_generation_source));
         decrypt_key(&src_kek, key_source)
+    }
+    pub fn derive_key(&self, xor: &AesKey, key_source: &AesKey) -> AesKey {
+        let mut t = Self::DERIVE_WITH.clone();
+        for (i, x) in t.iter_mut().zip(xor.iter()) {
+            *i ^= x;
+        }
+        let kek = self.generate_aes_kek(&t);
+        let key = self.generate_aes_key(&kek, key_source);
+        key
     }
 }
 
