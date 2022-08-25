@@ -23,7 +23,7 @@ struct Opt {
     #[structopt(parse(from_os_str))]
     output: PathBuf,
 
-    /// Bytes to skip in INPUT file
+    /// Bytes to skip in INPUT file. Should be the offset of 00:22:aa + 8
     #[structopt(short, long, default_value = "0")]
     offset: u64,
 
@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
     // let build_mode = matches.is_present("build");
     // let keyset = matches.value_of("keyset").unwrap_or_default();
     let mut keys = Keys::new();
-    
+
     log::info!("Loading keyset from {:?}...", opt.keyset);
     keys.read_from_file(&opt.keyset)?;
 
